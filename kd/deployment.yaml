@@ -1,0 +1,149 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: pttg-rps-scheduler
+  labels:
+    version: {{.VERSION}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: pttg-rps-scheduler
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: pttg-rps-scheduler
+        version: {{.VERSION}}
+    spec:
+      imagePullSecrets:
+      - name: registrykey
+      containers:
+      - name: vault-sidekick
+        image: quay.io/ukhomeofficedigital/vault-sidekick:v0.2.0
+        imagePullPolicy: Always
+        securityContext:
+           capabilities:
+             drop:
+               - SETUID
+               - SETGID
+        resources:
+         limits:
+          memory: "100Mi"
+          cpu: 100m
+         requests:
+          memory: "50Mi"
+          cpu: 100m
+        args:
+          - -output=/etc/nginx/secrets
+          - -tls-skip-verify=true
+          - -cn=pki:services/${NAMESPACE}/pki/issue/default:common_name=pttg-rps-scheduler.${NAMESPACE}.svc.cluster.local,file=/etc/nginx/secrets/pttg-rps-scheduler,fmt=bundle
+        env:
+          - name: VAULT_ADDR
+            value: "https://vault.vault.svc.cluster.local:8200"
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: VAULT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: store-token
+                key: token
+        volumeMounts:
+          - mountPath: /etc/nginx/secrets
+            name: secrets
+      - name: proxy
+        image: quay.io/ukhomeofficedigital/pttg-nginx-proxy:v3.1.3a
+        imagePullPolicy: Always
+        securityContext:
+           capabilities:
+             drop:
+               - SETUID
+               - SETGID
+        resources:
+         limits:
+          memory: "100Mi"
+          cpu: 100m
+         requests:
+          memory: "50Mi"
+          cpu: 100m
+        env:
+          - name: PROXY_SERVICE_HOST
+            value: '127.0.0.1'
+          - name: PROXY_SERVICE_PORT
+            value: '8080'
+          - name: NAXSI_USE_DEFAULT_RULES
+            value: 'FALSE'
+          - name: ENABLE_UUID_PARAM
+            value: 'FALSE'
+          - name: HTTPS_REDIRECT
+            value: 'FALSE'
+          - name: SERVER_CERT
+            value: /etc/nginx/secrets/pttg-rps-scheduler-bundle.pem
+          - name: SERVER_KEY
+            value: /etc/nginx/secrets/pttg-rps-scheduler-key.pem
+          - name: ADD_NGINX_SERVER_CFG
+            value: 'gzip off;'
+        volumeMounts:
+          - name: secrets
+            mountPath: /etc/nginx/secrets
+            readOnly: true
+        ports:
+          - name: https
+            containerPort: 10443
+      - name: pttg-rps-scheduler
+        image: quay.io/ukhomeofficedigital/pttg-rps-scheduler:{{.VERSION}}
+        securityContext:
+           capabilities:
+             drop:
+               - SETUID
+               - SETGID
+        env:
+          - name: JAVA_OPTS
+            value: "-Xms150m -Xmx250m"
+          - name: SERVER_PORT
+            value: '8080'
+          - name: ENDPOINTS_INFO_ENABLED
+            value: 'false'
+          - name: BASE_HMRC_ACCESS_CODE_URL
+            value: 'https://pttg-ip-hmrc-access-code.pt-i-{{.ENVIRONMENT}}.svc.cluster.local'
+        resources:
+          limits:
+            cpu: 1600m
+            memory: 612Mi
+          requests:
+            cpu: 100m
+            memory: 484Mi
+        ports:
+          - name: http
+            containerPort: 8080
+        livenessProbe:
+          httpGet
+            path: /healthz
+            port: http
+            httpHeaders:
+              - name: X-probe
+                value: kubelet
+          initialDelaySeconds: 240
+          periodSeconds: 20
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+            httpHeaders:
+              - name: X-probe
+                value: kubelet
+          periodSeconds: 20
+          timeoutSeconds: 5
+        imagePullPolicy: Always
+      volumes:
+      - name: secrets
+        emptyDir:
+          medium: "Memory"
