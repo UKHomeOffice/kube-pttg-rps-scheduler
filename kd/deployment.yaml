@@ -124,7 +124,7 @@ spec:
           - name: http
             containerPort: 8080
         livenessProbe:
-          httpGet
+          httpGet:
             path: /healthz
             port: http
             httpHeaders:
