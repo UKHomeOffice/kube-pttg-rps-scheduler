@@ -84,45 +84,6 @@ spec:
       imagePullSecrets:
       - name: registrykey
       containers:
-      - name: proxy
-        image: quay.io/ukhomeofficedigital/pttg-nginx-proxy:v3.1.3a
-        imagePullPolicy: Always
-        securityContext:
-           capabilities:
-             drop:
-               - SETUID
-               - SETGID
-        resources:
-         limits:
-          memory: "100Mi"
-          cpu: 100m
-         requests:
-          memory: "50Mi"
-          cpu: 100m
-        env:
-          - name: PROXY_SERVICE_HOST
-            value: '127.0.0.1'
-          - name: PROXY_SERVICE_PORT
-            value: '8080'
-          - name: NAXSI_USE_DEFAULT_RULES
-            value: 'FALSE'
-          - name: ENABLE_UUID_PARAM
-            value: 'FALSE'
-          - name: HTTPS_REDIRECT
-            value: 'FALSE'
-          - name: SERVER_CERT
-            value: /etc/nginx/secrets/pttg-rps-scheduler-bundle.pem
-          - name: SERVER_KEY
-            value: /etc/nginx/secrets/pttg-rps-scheduler-key.pem
-          - name: ADD_NGINX_SERVER_CFG
-            value: 'gzip off;'
-        volumeMounts:
-          - name: secrets
-            mountPath: /etc/nginx/secrets
-            readOnly: true
-        ports:
-          - name: https
-            containerPort: 10443
       - name: pttg-rps-scheduler
         image: quay.io/ukhomeofficedigital/pttg-rps-scheduler:{{.VERSION}}
         securityContext:
@@ -158,7 +119,7 @@ spec:
             httpHeaders:
               - name: X-probe
                 value: kubelet
-          initialDelaySeconds: 240
+          initialDelaySeconds: 10
           periodSeconds: 20
           timeoutSeconds: 10
         readinessProbe:
