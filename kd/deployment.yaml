@@ -169,7 +169,14 @@ spec:
           periodSeconds: 20
           timeoutSeconds: 5
         imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /data
+            name: javapki
+            readOnly: true
       volumes:
       - name: secrets
+        emptyDir:
+          medium: "Memory"
+      - name: javapki
         emptyDir:
           medium: "Memory"
