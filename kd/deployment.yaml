@@ -102,6 +102,11 @@ spec:
             value: 'https://pttg-ip-hmrc-access-code.pt-i-{{.ENVIRONMENT}}.svc.cluster.local'
           - name: JDK_TRUST_FILE
             value: '/data/truststore.jks'
+          - name: REFRESH_INTERVAL
+            valueFrom:
+              configMapKeyRef:
+                name: endpoint-config
+                key: HMRC_ACCESS_CODE_REFRESH_INTERVAL
         resources:
           limits:
             cpu: 1600m
